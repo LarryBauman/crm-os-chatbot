@@ -18,11 +18,22 @@ def get_messages():
     messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
     
     sorted_messages = sorted(messages.data, key=lambda m: m.created_at, reverse=False)
-    print(sorted_messages)
+    
     
     st.session_state.messages = [
         {"role": m.role, "content": m.content[0].text.value, "avatar": "🤷" if m.role == "user" else "📎"} for m in sorted_messages
     ]
+    
+def build_message_list():
+    # THis builds the chat thread
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"], avatar=message["avatar"]):
+         st.markdown(message["content"])
+    
+def new_thread_id():
+    create_thread_id.clear()
+    st.session_state.thread_id = create_thread_id()
+    
    
 
 
@@ -34,6 +45,16 @@ def run():
 
     st.write("# CRM OS Chat Bot! 📎")
     st.write("## Please ask a question about how to use CRM OS")
+    reset = st.button("Reset", type="secondary")
+    if reset:
+        new_thread_id()
+        
+    refresh = st.button("Refresh", type="secondary")
+    if refresh:
+        get_messages()
+        build_message_list()
+       
+    
 
 
 
@@ -46,21 +67,19 @@ def run():
 
     # print(st.session_state.thread_id)
     # print(st.session_state["openai_model"])
+    get_messages()
 
+    # if "messages" not in st.session_state:
+    #     st.session_state.messages = []
+    #     print("The 'messages' key is NOT present in st.session_state")
+    # else:
+    #     # Add your code here to run when the condition is false
+    #     # For example:
+    #     print("The 'messages' key is already present in st.session_state")
+    #     get_messages()
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-        print("The 'messages' key is NOT present in st.session_state")
-    else:
-        # Add your code here to run when the condition is false
-        # For example:
-        print("The 'messages' key is already present in st.session_state")
-        get_messages()
+    build_message_list()
 
-    # THis builds the chat thread
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"], avatar=message["avatar"]):
-         st.markdown(message["content"])
 
     if prompt := st.chat_input("How can I help?"):
         # create the message
@@ -70,6 +89,8 @@ def run():
             content = prompt
         )
         print("Message created")
+        st.session_state.messages.append({"role": "assistant", "content": "Please wait, processing your request...", "avatar": "⏳"})
+        build_message_list()
         
         run = client.beta.threads.runs.create(
             thread_id=st.session_state.thread_id,
@@ -77,18 +98,25 @@ def run():
         )
         print(run.status)
         
-        st.session_state.messages.append({"role": "assistant", "content": "Please wait, processing your request..."})
         
-        while run.status == "queued":
+        
+        while run.status == "queued" or run.status == "in_progress":
             time.sleep(1)
             print("waiting")
             run = client.beta.threads.runs.retrieve(
                 thread_id=st.session_state.thread_id,
                 run_id=run.id
             )
+            print(run.status)
+        
+        print(run.status)
         get_messages()
         
         
+        if run.status != "completed":
+            st.session_state.messages.append({"role": "assistant", "content": "There was an error, please ask again", "avatar": "🚫"})
+        
+        build_message_list()
         
         # st.session_state.messages.append({"role": "user", "content": prompt})
         # with st.chat_message("user"):
