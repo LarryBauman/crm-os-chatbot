@@ -18,6 +18,7 @@ def get_messages():
     messages = client.beta.threads.messages.list(thread_id=st.session_state.thread_id)
     
     sorted_messages = sorted(messages.data, key=lambda m: m.created_at, reverse=False)
+    print(sorted_messages)
     
     st.session_state.messages = [
         {"role": m.role, "content": m.content[0].text.value, "avatar": "🤷" if m.role == "user" else "📎"} for m in sorted_messages
@@ -49,6 +50,7 @@ def run():
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
+        print("The 'messages' key is NOT present in st.session_state")
     else:
         # Add your code here to run when the condition is false
         # For example:
@@ -67,6 +69,7 @@ def run():
             role="user",
             content = prompt
         )
+        print("Message created")
         
         run = client.beta.threads.runs.create(
             thread_id=st.session_state.thread_id,
